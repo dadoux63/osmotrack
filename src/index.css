@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    background-color: #f7f5f2;
+    color: #0f172a;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: #f7f5f2;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-stone-100 p-4;
+  }
+
+  .card-lg {
+    @apply bg-white rounded-xl shadow-sm border border-stone-100 p-6;
+  }
+
+  .btn-primary {
+    @apply bg-brand text-white font-semibold px-4 py-2 rounded-lg
+           hover:bg-brand-light active:bg-brand-dark
+           transition-colors duration-150 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-brand-dark border border-stone-200 font-medium px-4 py-2 rounded-lg
+           hover:bg-stone-50 active:bg-stone-100
+           transition-colors duration-150;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white font-semibold px-4 py-2 rounded-lg
+           hover:bg-red-700 active:bg-red-800
+           transition-colors duration-150;
+  }
+
+  .input-field {
+    @apply w-full border border-stone-200 rounded-lg px-3 py-2
+           bg-white text-brand-dark placeholder-stone-400
+           focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+           transition-shadow duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-brand-dark font-serif;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wider text-stone-500;
+  }
+
+  .badge-urgent {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+           bg-red-100 text-red-700 border border-red-200;
+  }
+
+  .badge-bientot {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+           bg-amber-100 text-amber-700 border border-amber-200;
+  }
+
+  .badge-ok {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+           bg-emerald-100 text-emerald-700 border border-emerald-200;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+           bg-blue-100 text-blue-700 border border-blue-200;
+  }
+
+  .badge-neutral {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold
+           bg-stone-100 text-stone-600 border border-stone-200;
+  }
+
+  .kpi-value {
+    @apply text-3xl font-bold text-brand-dark leading-none;
+  }
+
+  .kpi-unit {
+    @apply text-sm text-stone-500 ml-1;
+  }
+
+  .kpi-label {
+    @apply text-xs uppercase tracking-wider text-stone-500 mt-1;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+           transition-colors duration-150 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply bg-brand text-white;
+  }
+
+  .nav-item-inactive {
+    @apply text-stone-600 hover:bg-stone-100 hover:text-brand-dark;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1cdc7;
+  border-radius: 2px;
+}
+
+/* Safe area insets for PWA */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Chart container */
+.chart-container {
+  position: relative;
+  height: 220px;
+}

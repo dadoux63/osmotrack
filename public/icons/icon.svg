@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="80" fill="#185FA5"/>
+  <!-- Water drop -->
+  <path d="M256 100 C256 100 160 230 160 300 C160 355 203 400 256 400 C309 400 352 355 352 300 C352 230 256 100 256 100Z" fill="white" opacity="0.9"/>
+  <!-- Osmosis membrane symbol (horizontal lines) -->
+  <line x1="185" y1="290" x2="327" y2="290" stroke="#185FA5" stroke-width="8" stroke-linecap="round"/>
+  <line x1="200" y1="315" x2="312" y2="315" stroke="#185FA5" stroke-width="6" stroke-linecap="round"/>
+  <!-- O letter -->
+  <text x="256" y="480" font-family="Palatino, serif" font-size="40" font-weight="bold" fill="white" text-anchor="middle" opacity="0.7">OsmoTrack</text>
+</svg>
