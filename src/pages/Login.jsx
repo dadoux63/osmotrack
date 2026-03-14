@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Info } from 'lucide-react'
+import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { collection, getDocs, limit, query } from 'firebase/firestore'
-import { firestoreDb } from '../firebase'
 
 export default function Login() {
   const { currentUser, login, register } = useAuth()
   const navigate = useNavigate()
 
-  const [hasUsers, setHasUsers] = useState(null) // null = checking
+  const [isRegistering, setIsRegistering] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,18 +21,14 @@ export default function Login() {
     if (currentUser) navigate('/dashboard', { replace: true })
   }, [currentUser, navigate])
 
-  // Check if any user exists in Firestore (to show login vs register form)
-  useEffect(() => {
-    async function check() {
-      try {
-        const snap = await getDocs(query(collection(firestoreDb, 'users'), limit(1)))
-        setHasUsers(!snap.empty)
-      } catch {
-        setHasUsers(false)
-      }
-    }
-    check()
-  }, [])
+  function switchMode(registering) {
+    setIsRegistering(registering)
+    setError('')
+    setDisplayName('')
+    setEmail('')
+    setPassword('')
+    setConfirm('')
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -42,38 +36,30 @@ export default function Login() {
 
     if (!email.trim()) { setError("L'adresse email est requise."); return }
     if (password.length < 6) { setError('Le mot de passe doit comporter au moins 6 caractères.'); return }
-    if (!hasUsers && !displayName.trim()) { setError("Le nom d'utilisateur est requis."); return }
-    if (!hasUsers && password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return }
+    if (isRegistering && !displayName.trim()) { setError("Le nom d'utilisateur est requis."); return }
+    if (isRegistering && password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return }
 
     setLoading(true)
     try {
-      if (hasUsers) {
-        await login(email.trim(), password)
-      } else {
+      if (isRegistering) {
         await register(displayName.trim(), email.trim(), password)
+      } else {
+        await login(email.trim(), password)
       }
       // Navigation handled by useEffect watching currentUser
     } catch (err) {
       const msg = {
-        'auth/user-not-found':    'Identifiants incorrects.',
-        'auth/wrong-password':    'Identifiants incorrects.',
-        'auth/invalid-credential':'Identifiants incorrects.',
+        'auth/user-not-found':       'Identifiants incorrects.',
+        'auth/wrong-password':       'Identifiants incorrects.',
+        'auth/invalid-credential':   'Identifiants incorrects.',
         'auth/email-already-in-use': 'Cette adresse email est déjà utilisée.',
-        'auth/weak-password':     'Mot de passe trop faible (6 caractères minimum).',
-        'auth/invalid-email':     'Adresse email invalide.',
+        'auth/weak-password':        'Mot de passe trop faible (6 caractères minimum).',
+        'auth/invalid-email':        'Adresse email invalide.',
       }[err.code] ?? err.message
       setError(msg)
     } finally {
       setLoading(false)
     }
-  }
-
-  if (hasUsers === null) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-cream">
-        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
   }
 
   return (
@@ -93,24 +79,17 @@ export default function Login() {
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
           <h2 className="text-lg font-semibold text-brand-dark font-serif mb-1">
-            {hasUsers ? 'Connexion' : 'Créer un compte'}
+            {isRegistering ? 'Créer un compte' : 'Connexion'}
           </h2>
           <p className="text-sm text-stone-400 mb-5">
-            {hasUsers
-              ? 'Identifiez-vous pour accéder à vos données.'
-              : 'Première utilisation — créez votre compte.'}
+            {isRegistering
+              ? 'Première utilisation — créez votre compte.'
+              : 'Identifiez-vous pour accéder à vos données.'}
           </p>
-
-          {!hasUsers && (
-            <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-3 mb-5 text-sm text-blue-700">
-              <Info size={16} className="flex-shrink-0 mt-0.5" />
-              <span>Vos données existantes seront automatiquement synchronisées sur tous vos appareils.</span>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Display name — registration only */}
-            {!hasUsers && (
+            {isRegistering && (
               <div>
                 <label className="block text-xs font-medium text-stone-500 mb-1.5">Nom d'utilisateur</label>
                 <div className="relative">
@@ -122,7 +101,7 @@ export default function Login() {
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
                     placeholder="Votre prénom ou pseudo"
                     autoComplete="name"
-                    autoFocus={!hasUsers}
+                    autoFocus
                   />
                 </div>
               </div>
@@ -140,7 +119,7 @@ export default function Login() {
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
                   placeholder="vous@exemple.fr"
                   autoComplete="email"
-                  autoFocus={hasUsers}
+                  autoFocus={!isRegistering}
                 />
               </div>
             </div>
@@ -156,7 +135,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
                   placeholder="••••••••"
-                  autoComplete={hasUsers ? 'current-password' : 'new-password'}
+                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
                 />
                 <button
                   type="button"
@@ -170,7 +149,7 @@ export default function Login() {
             </div>
 
             {/* Confirm password — registration only */}
-            {!hasUsers && (
+            {isRegistering && (
               <div>
                 <label className="block text-xs font-medium text-stone-500 mb-1.5">Confirmer le mot de passe</label>
                 <div className="relative">
@@ -200,16 +179,33 @@ export default function Login() {
             >
               {loading ? (
                 <span>Chargement…</span>
-              ) : hasUsers ? (
-                <><LogIn size={16} />Se connecter</>
-              ) : (
+              ) : isRegistering ? (
                 <><UserPlus size={16} />Créer le compte</>
+              ) : (
+                <><LogIn size={16} />Se connecter</>
               )}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-stone-400 mt-6">
+        {/* Switch mode */}
+        <p className="text-center text-xs text-stone-400 mt-4">
+          {isRegistering ? (
+            <>Déjà un compte ?{' '}
+              <button onClick={() => switchMode(false)} className="text-brand underline">
+                Se connecter
+              </button>
+            </>
+          ) : (
+            <>Première utilisation ?{' '}
+              <button onClick={() => switchMode(true)} className="text-brand underline">
+                Créer un compte
+              </button>
+            </>
+          )}
+        </p>
+
+        <p className="text-center text-xs text-stone-300 mt-2">
           Données synchronisées via Firebase
         </p>
       </div>
