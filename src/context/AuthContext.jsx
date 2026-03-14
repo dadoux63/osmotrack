@@ -12,19 +12,23 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function init() {
-      const count = await db.users.count()
-      setHasUsers(count > 0)
+      try {
+        const count = await db.users.count()
+        setHasUsers(count > 0)
 
-      const storedId = localStorage.getItem(STORAGE_KEY)
-      if (storedId) {
-        const user = await db.users.get(Number(storedId))
-        if (user) {
-          setCurrentUser(user)
-          return
+        const storedId = localStorage.getItem(STORAGE_KEY)
+        if (storedId) {
+          const user = await db.users.get(Number(storedId))
+          if (user) {
+            setCurrentUser(user)
+            return
+          }
+          localStorage.removeItem(STORAGE_KEY)
         }
-        localStorage.removeItem(STORAGE_KEY)
+        setCurrentUser(null)
+      } catch {
+        setCurrentUser(null)
       }
-      setCurrentUser(null)
     }
     init()
   }, [])

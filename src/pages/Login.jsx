@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Droplets, User, Lock, Eye, EyeOff, LogIn, UserPlus, Info } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { hasUsers, login, register } = useAuth()
+  const { hasUsers, login, register, currentUser } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (currentUser) navigate('/dashboard', { replace: true })
+  }, [currentUser, navigate])
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -40,7 +44,7 @@ export default function Login() {
       } else {
         await register(username.trim(), password)
       }
-      navigate('/dashboard', { replace: true })
+      // Navigation handled by useEffect watching currentUser
     } catch (err) {
       setError(err.message)
     } finally {

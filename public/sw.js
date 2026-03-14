@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osmotrack-v1'
+const CACHE_NAME = 'osmotrack-v2'
 const STATIC_ASSETS = [
   '/osmotrack/',
   '/osmotrack/index.html',
