@@ -10,4 +10,13 @@ db.version(1).stores({
   settings: 'key',
 })
 
+db.version(2).stores({
+  readings: '++id, date',
+  interventions: '++id, date, equipment, category',
+  maintenance: '++id, equipment',
+  stocks: '++id, name, category',
+  settings: 'key',
+  users: '++id, &username',
+})
+
 export default db

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, X, LogOut } from 'lucide-react'
 import { Sidebar, BottomNav } from './Navigation'
+import { useAuth } from '../context/AuthContext'
 
 const PAGE_TITLES = {
   '/dashboard':   'Tableau de bord',
@@ -16,7 +17,14 @@ const PAGE_TITLES = {
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { logout } = useAuth()
   const title = PAGE_TITLES[location.pathname] || 'OsmoTrack'
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex h-screen h-dvh bg-cream overflow-hidden">
@@ -55,7 +63,13 @@ export default function Layout() {
             <Menu size={22} />
           </button>
           <h1 className="font-bold text-brand-dark font-serif">{title}</h1>
-          <div className="w-9" /> {/* spacer */}
+          <button
+            className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition"
+            onClick={handleLogout}
+            title="Déconnexion"
+          >
+            <LogOut size={18} />
+          </button>
         </header>
 
         {/* Page content */}

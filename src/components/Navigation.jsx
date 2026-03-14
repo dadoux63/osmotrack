@@ -1,8 +1,9 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, PlusCircle, Wrench, History,
-  Package, BarChart3, Settings, Droplets,
+  Package, BarChart3, Settings, Droplets, User, LogOut,
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_ITEMS = [
   { to: '/dashboard',  label: 'Tableau de bord', Icon: LayoutDashboard },
@@ -16,6 +17,14 @@ const NAV_ITEMS = [
 
 // ── Sidebar (desktop) ─────────────────────────────────────────
 export function Sidebar({ onClose }) {
+  const { currentUser, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <nav className="flex flex-col h-full">
       {/* Logo */}
@@ -47,10 +56,25 @@ export function Sidebar({ onClose }) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-stone-100">
+      <div className="px-3 py-3 border-t border-stone-100 space-y-2">
         <p className="text-xs text-stone-400 text-center">
           Système Water Light 3 étapes
         </p>
+        {currentUser && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <User size={14} className="text-stone-400 flex-shrink-0" />
+              <span className="text-xs text-stone-500 truncate">{currentUser.username}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition"
+              title="Déconnexion"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   )
