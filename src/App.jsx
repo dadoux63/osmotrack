@@ -14,7 +14,13 @@ function PrivateRoute({ children }) {
   const { currentUser } = useAuth()
 
   // Still loading session from IndexedDB
-  if (currentUser === undefined) return null
+  if (currentUser === undefined) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-cream">
+        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (!currentUser) return <Navigate to="/login" replace />
 

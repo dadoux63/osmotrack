@@ -1,7 +1,5 @@
-const CACHE_NAME = 'osmotrack-v2'
+const CACHE_NAME = 'osmotrack-v3'
 const STATIC_ASSETS = [
-  '/osmotrack/',
-  '/osmotrack/index.html',
   '/osmotrack/manifest.json',
   '/osmotrack/icons/icon.svg',
 ]
@@ -37,13 +35,22 @@ self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return
 
+  // Navigation requests (HTML pages): network-first so index.html is always fresh
+  // This ensures new deployments are picked up immediately
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/osmotrack/index.html'))
+    )
+    return
+  }
+
+  // Static assets (JS, CSS, images): cache-first for performance
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse
       }
       return fetch(event.request).then((response) => {
-        // Cache successful responses for static assets
         if (response.ok && event.request.url.includes('/osmotrack/')) {
           const responseToCache = response.clone()
           caches.open(CACHE_NAME).then((cache) => {
@@ -51,12 +58,7 @@ self.addEventListener('fetch', (event) => {
           })
         }
         return response
-      }).catch(() => {
-        // Return cached index.html for navigation requests (offline support)
-        if (event.request.mode === 'navigate') {
-          return caches.match('/osmotrack/index.html')
-        }
-      })
+      }).catch(() => null)
     })
   )
 })
