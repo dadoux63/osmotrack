@@ -1,8 +1,8 @@
-import { collection, doc, getDocsFromServer, limit, query, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDocs, limit, query, writeBatch } from 'firebase/firestore'
 import { firestoreDb } from '../firebase'
 
 async function isSeeded(uid) {
-  const snap = await getDocsFromServer(
+  const snap = await getDocs(
     query(collection(firestoreDb, `users/${uid}/settings`), limit(1))
   )
   return !snap.empty

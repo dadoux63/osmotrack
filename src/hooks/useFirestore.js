@@ -13,9 +13,11 @@ export function useCollection(path) {
   useEffect(() => {
     if (!path) return
     const ref = collection(firestoreDb, path)
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      setData(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    })
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => { setData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))) },
+      (err) => { console.error('[useCollection]', path, err) },
+    )
     return unsubscribe
   }, [path])
 
@@ -32,9 +34,11 @@ export function useDocument(path, docId) {
   useEffect(() => {
     if (!path || !docId) return
     const ref = doc(firestoreDb, path, docId)
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      setData(snap.exists() ? { id: snap.id, ...snap.data() } : null)
-    })
+    const unsubscribe = onSnapshot(
+      ref,
+      (snap) => { setData(snap.exists() ? { id: snap.id, ...snap.data() } : null) },
+      (err) => { console.error('[useDocument]', path, docId, err) },
+    )
     return unsubscribe
   }, [path, docId])
 

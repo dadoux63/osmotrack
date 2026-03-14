@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, X, LogOut } from 'lucide-react'
 import { Sidebar, BottomNav } from './Navigation'
-import { useAuth } from '../context/AuthContext'
+import { useLogout } from '../hooks/useLogout'
 
 const PAGE_TITLES = {
   '/dashboard':   'Tableau de bord',
@@ -17,14 +17,8 @@ const PAGE_TITLES = {
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
-  const { logout } = useAuth()
+  const handleLogout = useLogout()
   const title = PAGE_TITLES[location.pathname] || 'OsmoTrack'
-
-  function handleLogout() {
-    logout()
-    navigate('/login', { replace: true })
-  }
 
   return (
     <div className="flex h-screen h-dvh bg-cream overflow-hidden">
