@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth'
 import { auth } from '../firebase'
 import { migrateToFirestore } from '../db/migrateToFirestore'
+import { seedDatabase } from '../db/seedData'
 
 const AuthContext = createContext(null)
 
@@ -19,6 +20,8 @@ export function AuthProvider({ children }) {
       if (user) {
         // Migrate local Dexie data on first login from this device
         await migrateToFirestore(user.uid)
+        // Seed demo data if Firestore is still empty (new account, no local data)
+        await seedDatabase(user.uid)
       }
       setCurrentUser(user ?? null)
     })
