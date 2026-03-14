@@ -19,22 +19,33 @@ function MarkDoneModal({ item, onConfirm, onClose }) {
   const [date, setDate] = useState(todayISO())
   const [cost, setCost] = useState('')
   const [notes, setNotes] = useState('')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   async function handleConfirm() {
-    // Log intervention
-    await db.interventions.add({
-      date,
-      equipment: item.equipment,
-      category: item.category?.toLowerCase() || 'maintenance',
-      description: item.description,
-      supplier: '',
-      cost: cost ? Number(cost) : 0,
-      technician: 'Propriétaire',
-      notes,
-    })
-    // Update maintenance lastDate
-    await db.maintenance.update(item.id, { lastDate: date })
-    onConfirm()
+    setError(null)
+    setLoading(true)
+    try {
+      // Log intervention
+      await db.interventions.add({
+        date,
+        equipment: item.equipment,
+        category: item.category?.toLowerCase() || 'maintenance',
+        description: item.description,
+        supplier: '',
+        cost: cost ? Number(cost) : 0,
+        technician: 'Propriétaire',
+        notes,
+      })
+      // Update maintenance lastDate
+      await db.maintenance.update(item.id, { lastDate: date })
+      onConfirm()
+    } catch (err) {
+      setError("Erreur lors de l'enregistrement. Réessayez.")
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -57,10 +68,15 @@ function MarkDoneModal({ item, onConfirm, onClose }) {
             <label className="label">Notes</label>
             <textarea className="input-field resize-none" rows={2} placeholder="Observations…" value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
+          {error && (
+            <p className="text-sm text-red-500 font-medium">{error}</p>
+          )}
         </div>
         <div className="p-5 pt-0 flex gap-3">
-          <button className="btn-secondary flex-1" onClick={onClose}>Annuler</button>
-          <button className="btn-primary flex-1" onClick={handleConfirm}>Confirmer</button>
+          <button className="btn-secondary flex-1" onClick={onClose} disabled={loading}>Annuler</button>
+          <button className="btn-primary flex-1" onClick={handleConfirm} disabled={loading}>
+            {loading ? 'Enregistrement…' : 'Confirmer'}
+          </button>
         </div>
       </div>
     </div>
