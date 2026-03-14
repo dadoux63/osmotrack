@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { collection, getDocs, limit, query } from 'firebase/firestore'
+import { firestoreDb } from '../firebase'
 
 export default function Login() {
   const { currentUser, login, register } = useAuth()
@@ -60,6 +62,14 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (hasUsers === null) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-cream">
+        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
