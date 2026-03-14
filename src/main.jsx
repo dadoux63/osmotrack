@@ -2,10 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
-import { seedDatabase } from './db/seedData'
-
-// Seed initial data
-seedDatabase().catch(console.error)
 
 // Register service worker
 if ('serviceWorker' in navigator) {

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle, AlertTriangle, Info } from 'lucide-react'
-import db from '../db/database'
+import { addDoc, collection } from 'firebase/firestore'
+import { firestoreDb } from '../firebase'
+import { useAuth } from '../context/AuthContext'
 import { getReadingStatus, todayISO } from '../utils/maintenance'
 import StatusBadge from '../components/StatusBadge'
 
@@ -12,6 +14,7 @@ function calcRejection(tdsIn, tdsOut) {
 
 export default function NewReading() {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [form, setForm] = useState({
     date: todayISO(),
     tdsIn: '',
@@ -42,7 +45,7 @@ export default function NewReading() {
     }
 
     try {
-      await db.readings.add({
+      await addDoc(collection(firestoreDb, `users/${currentUser.uid}/readings`), {
         date: form.date,
         tdsIn: Number(form.tdsIn),
         tdsOut: Number(form.tdsOut),

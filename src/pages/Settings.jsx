@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore'
 import { Save, RefreshCw, AlertTriangle, Droplets, Beaker, ShieldAlert } from 'lucide-react'
-import db from '../db/database'
+import { firestoreDb } from '../firebase'
+import { useAuth } from '../context/AuthContext'
+import { useDocument } from '../hooks/useFirestore'
 import { seedDatabase } from '../db/seedData'
 
 function Section({ title, icon: Icon, children }) {
@@ -17,7 +19,9 @@ function Section({ title, icon: Icon, children }) {
 }
 
 function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step = '1' }) {
-  const setting = useLiveQuery(() => db.settings.get(settingKey), [settingKey])
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
+  const setting = useDocument(uid ? `users/${uid}/settings` : null, settingKey)
   const [val, setVal] = useState('')
 
   useEffect(() => {
@@ -25,7 +29,10 @@ function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step 
   }, [setting])
 
   async function save() {
-    await db.settings.put({ key: settingKey, value: type === 'number' ? Number(val) : val })
+    if (!uid) return
+    await setDoc(doc(firestoreDb, `users/${uid}/settings`, settingKey), {
+      value: type === 'number' ? Number(val) : val,
+    })
   }
 
   return (
@@ -53,6 +60,8 @@ function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step 
 export default function Settings() {
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetDone, setResetDone] = useState(false)
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
 
   const waterSourceFields = [
     { key: 'waterSourceTH', label: 'Dureté (TH)', unit: '°f' },
@@ -62,13 +71,17 @@ export default function Settings() {
   ]
 
   async function handleReset() {
-    await db.settings.put({ key: 'seeded', value: false })
-    await db.readings.clear()
-    await db.interventions.clear()
-    await db.maintenance.clear()
-    await db.stocks.clear()
-    await db.settings.where('key').notEqual('seeded').delete()
-    await seedDatabase()
+    if (!uid) return
+    const colls = ['readings', 'interventions', 'maintenance', 'stocks', 'settings']
+    for (const c of colls) {
+      const snap = await getDocs(collection(firestoreDb, `users/${uid}/${c}`))
+      if (snap.size > 0) {
+        const batch = writeBatch(firestoreDb)
+        snap.docs.forEach(d => batch.delete(d.ref))
+        await batch.commit()
+      }
+    }
+    await seedDatabase(uid)
     setConfirmReset(false)
     setResetDone(true)
     setTimeout(() => setResetDone(false), 3000)
@@ -208,7 +221,7 @@ export default function Settings() {
       )}
 
       <p className="text-center text-xs text-stone-300 pb-4">
-        OsmoTrack v1.0.0 — Données stockées localement (IndexedDB)
+        OsmoTrack v1.0.0 — Données synchronisées via Firebase
       </p>
     </div>
   )

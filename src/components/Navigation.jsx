@@ -64,7 +64,7 @@ export function Sidebar({ onClose }) {
           <div className="flex items-center gap-2 px-1">
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <User size={14} className="text-stone-400 flex-shrink-0" />
-              <span className="text-xs text-stone-500 truncate">{currentUser.username}</span>
+              <span className="text-xs text-stone-500 truncate">{currentUser.displayName || currentUser.email}</span>
             </div>
             <button
               onClick={handleLogout}

@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { addDoc, updateDoc, collection, doc } from 'firebase/firestore'
 import { CheckCircle2, ChevronRight, CalendarCheck } from 'lucide-react'
-import db from '../db/database'
+import { firestoreDb } from '../firebase'
+import { useAuth } from '../context/AuthContext'
+import { useCollection } from '../hooks/useFirestore'
 import StatusBadge from '../components/StatusBadge'
 import { getMaintenanceStatus, formatDate, formatDateLong, todayISO } from '../utils/maintenance'
 
@@ -15,14 +17,14 @@ function daysLabel(days) {
   return `Dans ${days} j`
 }
 
-function MarkDoneModal({ item, onConfirm, onClose }) {
+function MarkDoneModal({ item, uid, onConfirm, onClose }) {
   const [date, setDate] = useState(todayISO())
   const [cost, setCost] = useState('')
   const [notes, setNotes] = useState('')
 
   async function handleConfirm() {
     // Log intervention
-    await db.interventions.add({
+    await addDoc(collection(firestoreDb, `users/${uid}/interventions`), {
       date,
       equipment: item.equipment,
       category: item.category?.toLowerCase() || 'maintenance',
@@ -33,7 +35,7 @@ function MarkDoneModal({ item, onConfirm, onClose }) {
       notes,
     })
     // Update maintenance lastDate
-    await db.maintenance.update(item.id, { lastDate: date })
+    await updateDoc(doc(firestoreDb, `users/${uid}/maintenance`, item.id), { lastDate: date })
     onConfirm()
   }
 
@@ -71,8 +73,10 @@ export default function Maintenance() {
   const [activeCategory, setActiveCategory] = useState('Tous')
   const [modalItem, setModalItem] = useState(null)
   const [done, setDone] = useState(null)
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
 
-  const maintenance = useLiveQuery(() => db.maintenance.toArray())
+  const maintenance = useCollection(uid ? `users/${uid}/maintenance` : null)
 
   const items = maintenance
     ?.map(m => ({ ...m, ...getMaintenanceStatus(m.lastDate, m.intervalDays) }))
@@ -171,6 +175,7 @@ export default function Maintenance() {
       {modalItem && (
         <MarkDoneModal
           item={modalItem}
+          uid={uid}
           onConfirm={() => {
             setModalItem(null)
             setDone(modalItem.id)

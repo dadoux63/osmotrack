@@ -1,4 +1,3 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Bar, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -6,7 +5,8 @@ import {
   ArcElement, Title, Tooltip, Legend,
 } from 'chart.js'
 import { TrendingUp, Euro } from 'lucide-react'
-import db from '../db/database'
+import { useAuth } from '../context/AuthContext'
+import { useCollection, useDocument } from '../hooks/useFirestore'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
@@ -33,9 +33,11 @@ const CATEGORY_COLORS = {
 const ANNUAL_BUDGET = 479
 
 export default function Costs() {
-  const interventions = useLiveQuery(() => db.interventions.toArray())
-  const budgetSetting = useLiveQuery(() => db.settings.get('annualBudget'))
-  const budget = budgetSetting?.value ?? ANNUAL_BUDGET
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
+  const interventions = useCollection(uid ? `users/${uid}/interventions` : null)
+  const budgetDoc = useDocument(uid ? `users/${uid}/settings` : null, 'annualBudget')
+  const budget = budgetDoc?.value ?? ANNUAL_BUDGET
 
   if (!interventions) return null
 
