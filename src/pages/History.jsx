@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { deleteDoc, doc } from 'firebase/firestore'
 import { Trash2, Filter, Euro } from 'lucide-react'
-import db from '../db/database'
+import { firestoreDb } from '../firebase'
+import { useAuth } from '../context/AuthContext'
+import { useCollection } from '../hooks/useFirestore'
 import { formatDateLong } from '../utils/maintenance'
 
 const CATEGORIES = {
@@ -26,14 +28,17 @@ function CategoryTag({ category }) {
 export default function History() {
   const [filterCategory, setFilterCategory] = useState('tous')
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
 
-  const interventions = useLiveQuery(() =>
-    db.interventions.orderBy('date').reverse().toArray()
-  )
-
-  const readings = useLiveQuery(() =>
-    db.readings.orderBy('date').reverse().toArray()
-  )
+  const interventionsRaw = useCollection(uid ? `users/${uid}/interventions` : null)
+  const readingsRaw = useCollection(uid ? `users/${uid}/readings` : null)
+  const interventions = interventionsRaw
+    ? [...interventionsRaw].sort((a, b) => b.date.localeCompare(a.date))
+    : undefined
+  const readings = readingsRaw
+    ? [...readingsRaw].sort((a, b) => b.date.localeCompare(a.date))
+    : undefined
 
   const filtered = interventions?.filter(i =>
     filterCategory === 'tous' || i.category === filterCategory
@@ -43,7 +48,7 @@ export default function History() {
   const allTotal = interventions?.reduce((s, i) => s + (i.cost || 0), 0) ?? 0
 
   async function deleteIntervention(id) {
-    await db.interventions.delete(id)
+    await deleteDoc(doc(firestoreDb, `users/${uid}/interventions`, id))
     setConfirmDelete(null)
   }
 

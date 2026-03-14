@@ -1,51 +1,79 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Droplets, User, Lock, Eye, EyeOff, LogIn, UserPlus, Info } from 'lucide-react'
+import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Info } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { collection, getDocs, limit, query } from 'firebase/firestore'
+import { firestoreDb } from '../firebase'
 
 export default function Login() {
-  const { hasUsers, login, register } = useAuth()
+  const { currentUser, login, register } = useAuth()
   const navigate = useNavigate()
 
-  const [username, setUsername] = useState('')
+  const [hasUsers, setHasUsers] = useState(null) // null = checking
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (currentUser) navigate('/dashboard', { replace: true })
+  }, [currentUser, navigate])
+
+  // Check if any user exists in Firestore (to show login vs register form)
+  useEffect(() => {
+    async function check() {
+      try {
+        const snap = await getDocs(query(collection(firestoreDb, 'users'), limit(1)))
+        setHasUsers(!snap.empty)
+      } catch {
+        setHasUsers(false)
+      }
+    }
+    check()
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
 
-    if (!username.trim()) {
-      setError('Le nom d\'utilisateur est requis.')
-      return
-    }
-    if (password.length < 6) {
-      setError('Le mot de passe doit comporter au moins 6 caractères.')
-      return
-    }
-
-    if (!hasUsers && password !== confirm) {
-      setError('Les mots de passe ne correspondent pas.')
-      return
-    }
+    if (!email.trim()) { setError("L'adresse email est requise."); return }
+    if (password.length < 6) { setError('Le mot de passe doit comporter au moins 6 caractères.'); return }
+    if (!hasUsers && !displayName.trim()) { setError("Le nom d'utilisateur est requis."); return }
+    if (!hasUsers && password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return }
 
     setLoading(true)
     try {
       if (hasUsers) {
-        await login(username.trim(), password)
+        await login(email.trim(), password)
       } else {
-        await register(username.trim(), password)
+        await register(displayName.trim(), email.trim(), password)
       }
-      navigate('/dashboard', { replace: true })
+      // Navigation handled by useEffect watching currentUser
     } catch (err) {
-      setError(err.message)
+      const msg = {
+        'auth/user-not-found':    'Identifiants incorrects.',
+        'auth/wrong-password':    'Identifiants incorrects.',
+        'auth/invalid-credential':'Identifiants incorrects.',
+        'auth/email-already-in-use': 'Cette adresse email est déjà utilisée.',
+        'auth/weak-password':     'Mot de passe trop faible (6 caractères minimum).',
+        'auth/invalid-email':     'Adresse email invalide.',
+      }[err.code] ?? err.message
+      setError(msg)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (hasUsers === null) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-cream">
+        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -73,39 +101,53 @@ export default function Login() {
               : 'Première utilisation — créez votre compte.'}
           </p>
 
-          {/* Info banner for first registration */}
           {!hasUsers && (
             <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-3 mb-5 text-sm text-blue-700">
               <Info size={16} className="flex-shrink-0 mt-0.5" />
-              <span>Vos données existantes seront automatiquement associées à ce compte.</span>
+              <span>Vos données existantes seront automatiquement synchronisées sur tous vos appareils.</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username */}
+            {/* Display name — registration only */}
+            {!hasUsers && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1.5">Nom d'utilisateur</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
+                    placeholder="Votre prénom ou pseudo"
+                    autoComplete="name"
+                    autoFocus={!hasUsers}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                Nom d'utilisateur
-              </label>
+              <label className="block text-xs font-medium text-stone-500 mb-1.5">Adresse email</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
-                  placeholder="Votre nom d'utilisateur"
-                  autoComplete="username"
-                  autoFocus
+                  placeholder="vous@exemple.fr"
+                  autoComplete="email"
+                  autoFocus={hasUsers}
                 />
               </div>
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                Mot de passe
-              </label>
+              <label className="block text-xs font-medium text-stone-500 mb-1.5">Mot de passe</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
@@ -127,42 +169,30 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Confirm password (registration only) */}
+            {/* Confirm password — registration only */}
             {!hasUsers && (
               <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                  Confirmer le mot de passe
-                </label>
+                <label className="block text-xs font-medium text-stone-500 mb-1.5">Confirmer le mot de passe</label>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                   <input
-                    type={showConfirm ? 'text' : 'password'}
+                    type={showPassword ? 'text' : 'password'}
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition"
                     placeholder="••••••••"
                     autoComplete="new-password"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                    tabIndex={-1}
-                  >
-                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
                 </div>
               </div>
             )}
 
-            {/* Error */}
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5">
                 {error}
               </p>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
@@ -171,22 +201,16 @@ export default function Login() {
               {loading ? (
                 <span>Chargement…</span>
               ) : hasUsers ? (
-                <>
-                  <LogIn size={16} />
-                  Se connecter
-                </>
+                <><LogIn size={16} />Se connecter</>
               ) : (
-                <>
-                  <UserPlus size={16} />
-                  Créer le compte
-                </>
+                <><UserPlus size={16} />Créer le compte</>
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-stone-400 mt-6">
-          Système Water Light 3 étapes
+          Données synchronisées via Firebase
         </p>
       </div>
     </div>

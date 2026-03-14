@@ -1,19 +1,20 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { updateDoc, addDoc, collection, doc } from 'firebase/firestore'
 import { Plus, Minus, ShoppingCart, Package } from 'lucide-react'
-import db from '../db/database'
+import { firestoreDb } from '../firebase'
+import { useAuth } from '../context/AuthContext'
+import { useCollection } from '../hooks/useFirestore'
 import StatusBadge from '../components/StatusBadge'
 import { getStockStatus } from '../utils/maintenance'
 
 const CATEGORIES = ['Tous', 'Filtres entrée', 'Adoucisseur', 'Lampe UV', 'Osmoseur']
 
-function StockItem({ item, onUpdate }) {
+function StockItem({ item, uid }) {
   const status = getStockStatus(item.currentQty, item.minQty)
 
   async function adjustQty(delta) {
     const newQty = Math.max(0, item.currentQty + delta)
-    await db.stocks.update(item.id, { currentQty: newQty })
-    onUpdate?.()
+    await updateDoc(doc(firestoreDb, `users/${uid}/stocks`, item.id), { currentQty: newQty })
   }
 
   return (
@@ -71,7 +72,7 @@ function StockItem({ item, onUpdate }) {
   )
 }
 
-function AddStockModal({ onClose }) {
+function AddStockModal({ uid, onClose }) {
   const [form, setForm] = useState({
     name: '', category: 'Osmoseur', currentQty: '', minQty: '',
     unit: 'pièce', supplier: '', unitPrice: '', notes: '',
@@ -81,7 +82,7 @@ function AddStockModal({ onClose }) {
 
   async function handleAdd(e) {
     e.preventDefault()
-    await db.stocks.add({
+    await addDoc(collection(firestoreDb, `users/${uid}/stocks`), {
       name: form.name,
       category: form.category,
       currentQty: Number(form.currentQty),
@@ -151,8 +152,10 @@ function AddStockModal({ onClose }) {
 export default function Stocks() {
   const [activeCategory, setActiveCategory] = useState('Tous')
   const [showAdd, setShowAdd] = useState(false)
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
 
-  const stocks = useLiveQuery(() => db.stocks.toArray())
+  const stocks = useCollection(uid ? `users/${uid}/stocks` : null)
 
   const filtered = stocks
     ?.filter(s => activeCategory === 'Tous' || s.category === activeCategory)
@@ -213,7 +216,7 @@ export default function Stocks() {
 
       {/* Liste */}
       <div className="space-y-2">
-        {filtered.map(item => <StockItem key={item.id} item={item} />)}
+        {filtered.map(item => <StockItem key={item.id} item={item} uid={uid} />)}
         {filtered.length === 0 && (
           <div className="text-center py-10">
             <Package size={32} className="text-stone-200 mx-auto mb-2" />
@@ -230,7 +233,7 @@ export default function Stocks() {
         <Plus size={22} />
       </button>
 
-      {showAdd && <AddStockModal onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddStockModal uid={uid} onClose={() => setShowAdd(false)} />}
     </div>
   )
 }

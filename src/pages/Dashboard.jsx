@@ -1,4 +1,3 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -6,7 +5,8 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js'
 import { AlertTriangle, Droplets, Activity, Package, Wrench } from 'lucide-react'
-import db from '../db/database'
+import { useAuth } from '../context/AuthContext'
+import { useCollection } from '../hooks/useFirestore'
 import KPICard from '../components/KPICard'
 import StatusBadge from '../components/StatusBadge'
 import { getMaintenanceStatus, getStockStatus, formatDate } from '../utils/maintenance'
@@ -28,11 +28,14 @@ function getTdsAccent(tds) {
 }
 
 export default function Dashboard() {
-  const readings = useLiveQuery(() =>
-    db.readings.orderBy('date').reverse().limit(10).toArray()
-  )
-  const maintenance = useLiveQuery(() => db.maintenance.toArray())
-  const stocks = useLiveQuery(() => db.stocks.toArray())
+  const { currentUser } = useAuth()
+  const uid = currentUser?.uid
+  const readingsAll = useCollection(uid ? `users/${uid}/readings` : null)
+  const maintenance = useCollection(uid ? `users/${uid}/maintenance` : null)
+  const stocks = useCollection(uid ? `users/${uid}/stocks` : null)
+  const readings = readingsAll
+    ? [...readingsAll].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+    : undefined
 
   const latest = readings?.[0]
   const urgentMaintenance = maintenance?.filter(m => {

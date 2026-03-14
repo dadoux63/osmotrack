@@ -1,70 +1,48 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import db from '../db/database'
-import { hashPassword, verifyPassword } from '../utils/auth'
-
-const STORAGE_KEY = 'osmotrack_user_id'
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+} from 'firebase/auth'
+import { auth } from '../firebase'
+import { migrateToFirestore } from '../db/migrateToFirestore'
+import { seedDatabase } from '../db/seedData'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(undefined) // undefined = loading
-  const [hasUsers, setHasUsers] = useState(false)
 
   useEffect(() => {
-    async function init() {
-      const count = await db.users.count()
-      setHasUsers(count > 0)
-
-      const storedId = localStorage.getItem(STORAGE_KEY)
-      if (storedId) {
-        const user = await db.users.get(Number(storedId))
-        if (user) {
-          setCurrentUser(user)
-          return
-        }
-        localStorage.removeItem(STORAGE_KEY)
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Migrate local Dexie data on first login from this device
+        await migrateToFirestore(user.uid)
+        // Seed demo data if Firestore is still empty (new account, no local data)
+        await seedDatabase(user.uid)
       }
-      setCurrentUser(null)
-    }
-    init()
+      setCurrentUser(user ?? null)
+    })
+    return unsubscribe
   }, [])
 
-  async function register(username, password) {
-    const existing = await db.users.where('username').equals(username).first()
-    if (existing) throw new Error('Ce nom d\'utilisateur est déjà pris.')
-
-    const { hash, salt } = await hashPassword(password)
-    const id = await db.users.add({
-      username,
-      passwordHash: hash,
-      salt,
-      createdAt: new Date().toISOString(),
-    })
-
-    const user = await db.users.get(id)
-    localStorage.setItem(STORAGE_KEY, String(id))
-    setCurrentUser(user)
-    setHasUsers(true)
+  async function register(displayName, email, password) {
+    const credential = await createUserWithEmailAndPassword(auth, email, password)
+    await updateProfile(credential.user, { displayName })
   }
 
-  async function login(username, password) {
-    const user = await db.users.where('username').equals(username).first()
-    if (!user) throw new Error('Identifiants incorrects.')
-
-    const valid = await verifyPassword(password, user.passwordHash, user.salt)
-    if (!valid) throw new Error('Identifiants incorrects.')
-
-    localStorage.setItem(STORAGE_KEY, String(user.id))
-    setCurrentUser(user)
+  async function login(email, password) {
+    await signInWithEmailAndPassword(auth, email, password)
   }
 
   function logout() {
-    localStorage.removeItem(STORAGE_KEY)
-    setCurrentUser(null)
+    return signOut(auth)
   }
 
   return (
-    <AuthContext.Provider value={{ currentUser, hasUsers, register, login, logout }}>
+    <AuthContext.Provider value={{ currentUser, register, login, logout }}>
       {children}
     </AuthContext.Provider>
   )
