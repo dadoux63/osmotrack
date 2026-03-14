@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,9 +15,13 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 
-// Persistent cache enables offline support across multiple tabs
-export const firestoreDb = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
-})
+// Persistent offline cache — falls back to memory cache if IndexedDB unavailable (e.g. Comet browser)
+let firestoreDb
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }),
+  })
+} catch {
+  firestoreDb = getFirestore(app)
+}
+export { firestoreDb }
