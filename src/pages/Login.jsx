@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { collection, getDocs, limit, query } from 'firebase/firestore'
-import { firestoreDb } from '../firebase'
 
 export default function Login() {
   const { currentUser, login, register } = useAuth()
@@ -18,7 +16,6 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Redirect if already logged in
   useEffect(() => {
     if (currentUser) navigate('/dashboard', { replace: true })
   }, [currentUser, navigate])
@@ -48,7 +45,6 @@ export default function Login() {
       } else {
         await login(email.trim(), password)
       }
-      // Navigation handled by useEffect watching currentUser
     } catch (err) {
       const msg = {
         'auth/user-not-found':       'Identifiants incorrects.',
@@ -64,18 +60,9 @@ export default function Login() {
     }
   }
 
-  if (hasUsers === null) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-cream">
-        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-cream flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
           <div className="w-14 h-14 bg-brand rounded-2xl flex items-center justify-center shadow-lg">
             <Droplets size={28} className="text-white" />
@@ -86,7 +73,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
           <h2 className="text-lg font-semibold text-brand-dark font-serif mb-1">
             {isRegistering ? 'Créer un compte' : 'Connexion'}
@@ -98,7 +84,6 @@ export default function Login() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Display name — registration only */}
             {isRegistering && (
               <div>
                 <label className="block text-xs font-medium text-stone-500 mb-1.5">Nom d'utilisateur</label>
@@ -117,7 +102,6 @@ export default function Login() {
               </div>
             )}
 
-            {/* Email */}
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1.5">Adresse email</label>
               <div className="relative">
@@ -134,7 +118,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1.5">Mot de passe</label>
               <div className="relative">
@@ -158,7 +141,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Confirm password — registration only */}
             {isRegistering && (
               <div>
                 <label className="block text-xs font-medium text-stone-500 mb-1.5">Confirmer le mot de passe</label>
@@ -198,7 +180,6 @@ export default function Login() {
           </form>
         </div>
 
-        {/* Switch mode */}
         <p className="text-center text-xs text-stone-400 mt-4">
           {isRegistering ? (
             <>Déjà un compte ?{' '}
