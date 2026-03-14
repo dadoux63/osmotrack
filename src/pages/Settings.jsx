@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore'
 import { Save, RefreshCw, AlertTriangle, Droplets, Beaker, ShieldAlert } from 'lucide-react'
 import { firestoreDb } from '../firebase'
@@ -60,8 +60,11 @@ function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step 
 export default function Settings() {
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetDone, setResetDone] = useState(false)
+  const resetTimerRef = useRef(null)
   const { currentUser } = useAuth()
   const uid = currentUser?.uid
+
+  useEffect(() => () => clearTimeout(resetTimerRef.current), [])
 
   const waterSourceFields = [
     { key: 'waterSourceTH', label: 'Dureté (TH)', unit: '°f' },
@@ -73,18 +76,19 @@ export default function Settings() {
   async function handleReset() {
     if (!uid) return
     const colls = ['readings', 'interventions', 'maintenance', 'stocks', 'settings']
-    for (const c of colls) {
+    await Promise.all(colls.map(async (c) => {
       const snap = await getDocs(collection(firestoreDb, `users/${uid}/${c}`))
       if (snap.size > 0) {
         const batch = writeBatch(firestoreDb)
         snap.docs.forEach(d => batch.delete(d.ref))
         await batch.commit()
       }
-    }
+    }))
     await seedDatabase(uid)
     setConfirmReset(false)
     setResetDone(true)
-    setTimeout(() => setResetDone(false), 3000)
+    clearTimeout(resetTimerRef.current)
+    resetTimerRef.current = setTimeout(() => setResetDone(false), 3000)
   }
 
   return (

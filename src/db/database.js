@@ -16,7 +16,6 @@ db.version(2).stores({
   maintenance: '++id, equipment',
   stocks: '++id, name, category',
   settings: 'key',
-  users: '++id, &username',
 })
 
 export default db
