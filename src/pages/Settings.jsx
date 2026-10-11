@@ -58,6 +58,14 @@ function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step 
   )
 }
 
+function formatBuildTime(iso) {
+  return new Date(iso).toLocaleString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }).replace(',', ' à')
+}
+
 function PushSection({ uid }) {
   const [state, setState] = useState('loading') // loading | unsupported | off | on | denied
   const [busy, setBusy] = useState(false)
@@ -284,7 +292,9 @@ export default function Settings() {
       )}
 
       <p className="text-center text-xs text-stone-300 pb-4">
-        OsmoTrack v1.0.0 — Données synchronisées via Firebase
+        OsmoTrack — version du {formatBuildTime(__BUILD_TIME__)} ({__BUILD_COMMIT__})
+        <br />
+        Données synchronisées via Firebase
       </p>
     </div>
   )
