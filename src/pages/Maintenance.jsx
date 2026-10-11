@@ -22,8 +22,10 @@ function MarkDoneModal({ item, uid, stocks, onConfirm, onClose }) {
   const [date, setDate] = useState(todayISO())
   const [cost, setCost] = useState('')
   const [notes, setNotes] = useState('')
-  const [stockId, setStockId] = useState('')
-  const [qty, setQty] = useState('1')
+  const [stockId, setStockId] = useState(
+    stocks.some(st => st.id === item.defaultStockId) ? item.defaultStockId : ''
+  )
+  const [qty, setQty] = useState(String(item.defaultStockQty ?? 1))
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -50,7 +52,11 @@ function MarkDoneModal({ item, uid, stocks, onConfirm, onClose }) {
         link: selected && Number(qty) > 0 ? { stockId: selected.id, qty: -Number(qty) } : null,
         previous: null,
         stocks,
-        extra: (batch) => batch.update(doc(firestoreDb, `users/${uid}/maintenance`, item.id), { lastDate: date }),
+        extra: (batch) => batch.update(doc(firestoreDb, `users/${uid}/maintenance`, item.id), {
+          lastDate: date,
+          defaultStockId: selected?.id ?? null,
+          defaultStockQty: selected ? Number(qty) : null,
+        }),
       })
       onConfirm()
     } catch (err) {
@@ -77,7 +83,9 @@ function MarkDoneModal({ item, uid, stocks, onConfirm, onClose }) {
             <input type="number" min="0" step="0.01" className="input-field" placeholder="0" value={cost} onChange={e => setCost(e.target.value)} />
           </div>
           <div className="rounded-xl bg-stone-50 p-3 space-y-3">
-            <p className="text-xs text-stone-500">Article utilisé (optionnel) : sa quantité est retirée du stock.</p>
+            <p className="text-xs text-stone-500">
+              Article utilisé (optionnel) : sa quantité est retirée du stock. Votre dernier choix est proposé la fois suivante.
+            </p>
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
                 <label className="label">Article</label>
