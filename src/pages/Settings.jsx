@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore'
-import { Save, RefreshCw, AlertTriangle, Droplets, Beaker, ShieldAlert } from 'lucide-react'
+import { Save, RefreshCw, AlertTriangle, Droplets, Beaker, ShieldAlert, Bell } from 'lucide-react'
 import { firestoreDb } from '../firebase'
+import { isPushSupported, isPushEnabled, enablePush, disablePush } from '../notifications'
 import { useAuth } from '../context/AuthContext'
 import { useDocument } from '../hooks/useFirestore'
 import { seedDatabase } from '../db/seedData'
@@ -54,6 +55,62 @@ function SettingRow({ label, desc, settingKey, unit, type = 'number', min, step 
         {unit && <span className="text-xs text-stone-400 w-10">{unit}</span>}
       </div>
     </div>
+  )
+}
+
+function PushSection({ uid }) {
+  const [state, setState] = useState('loading') // loading | unsupported | off | on | denied
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function check() {
+      if (!(await isPushSupported())) return setState('unsupported')
+      if (Notification.permission === 'denied') return setState('denied')
+      setState((await isPushEnabled()) ? 'on' : 'off')
+    }
+    check().then(() => {}, () => !cancelled && setState('unsupported'))
+    return () => { cancelled = true }
+  }, [])
+
+  async function toggle() {
+    if (!uid || busy) return
+    setBusy(true)
+    try {
+      if (state === 'on') {
+        await disablePush(uid)
+        setState('off')
+      } else {
+        await enablePush(uid)
+        setState('on')
+      }
+    } catch (err) {
+      setState(err.message === 'denied' ? 'denied' : 'off')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const messages = {
+    unsupported: "Les notifications ne sont pas disponibles sur ce navigateur. Sur iPhone, ajoutez d'abord l'appli à l'écran d'accueil.",
+    denied: "Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.",
+    off: 'Une notification par semaine, le lundi matin, uniquement si une maintenance est urgente ou un stock à commander.',
+    on: 'Activées sur cet appareil. Une notification maximum par semaine (lundi matin).',
+  }
+
+  return (
+    <Section title="Rappels par notification" icon={Bell}>
+      <p className="text-sm text-stone-500">{messages[state] ?? 'Vérification…'}</p>
+      {(state === 'off' || state === 'on') && (
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className={state === 'on' ? 'btn-secondary w-full' : 'btn-primary w-full'}
+        >
+          {busy ? '…' : state === 'on' ? 'Désactiver sur cet appareil' : 'Activer sur cet appareil'}
+        </button>
+      )}
+    </Section>
   )
 }
 
@@ -140,6 +197,8 @@ export default function Settings() {
           min="0" step="5"
         />
       </Section>
+
+      <PushSection uid={uid} />
 
       {/* Budget */}
       <Section title="Budget annuel" icon={null}>

@@ -28,6 +28,31 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try { payload = event.data ? event.data.json() : {} } catch { payload = {} }
+  const d = payload.data || payload.notification || payload
+  event.waitUntil(
+    self.registration.showNotification(d.title || 'OsmoTrack', {
+      body: d.body || '',
+      tag: 'osmotrack-weekly',
+      data: { route: d.route || '/dashboard' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = self.registration.scope + '#' + (event.notification.data?.route || '/dashboard')
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const open = clients.find((c) => c.url.startsWith(self.registration.scope))
+      if (open) return open.focus().then((c) => c.navigate(url))
+      return self.clients.openWindow(url)
+    })
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return
