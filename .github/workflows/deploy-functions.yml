@@ -40,6 +40,6 @@ jobs:
             || { echo "::error::Le secret FIREBASE_SERVICE_ACCOUNT n'est pas un JSON de clé de compte de service complet."; exit 1; }
 
       - name: Deploy functions
-        run: npx --yes firebase-tools@latest deploy --only functions --project "${{ secrets.VITE_FIREBASE_PROJECT_ID }}" --non-interactive
+        run: npx --yes firebase-tools@latest deploy --only functions --project "${{ secrets.VITE_FIREBASE_PROJECT_ID }}" --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
