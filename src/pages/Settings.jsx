@@ -140,7 +140,7 @@ export default function Settings() {
 
   async function handleReset() {
     if (!uid) return
-    const colls = ['readings', 'interventions', 'maintenance', 'stocks', 'settings']
+    const colls = ['readings', 'interventions', 'maintenance', 'stocks', 'stockMovements', 'settings']
     await Promise.all(colls.map(async (c) => {
       const snap = await getDocs(collection(firestoreDb, `users/${uid}/${c}`))
       if (snap.size > 0) {

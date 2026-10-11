@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { deleteDoc, doc, updateDoc } from 'firebase/firestore'
-import { Trash2, Pencil } from 'lucide-react'
-import { firestoreDb } from '../firebase'
+import { Trash2, Pencil, Plus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCollection } from '../hooks/useFirestore'
-import { formatDateLong } from '../utils/maintenance'
+import { saveIntervention, removeIntervention } from '../db/interventions'
+import { formatDateLong, todayISO } from '../utils/maintenance'
 
 const CATEGORIES = {
   filtre: { label: 'Filtre', color: 'bg-blue-100 text-blue-700' },
@@ -35,6 +34,8 @@ export default function History() {
 
   const interventionsRaw = useCollection(uid ? `users/${uid}/interventions` : null)
   const readingsRaw = useCollection(uid ? `users/${uid}/readings` : null)
+  const stocksRaw = useCollection(uid ? `users/${uid}/stocks` : null)
+  const stocks = stocksRaw ? [...stocksRaw].sort((a, b) => a.name.localeCompare(b.name, 'fr')) : []
   const interventions = interventionsRaw
     ? [...interventionsRaw].sort((a, b) => b.date.localeCompare(a.date))
     : undefined
@@ -49,9 +50,27 @@ export default function History() {
   const totalCost = filtered.reduce((s, i) => s + (i.cost || 0), 0)
   const allTotal = interventions?.reduce((s, i) => s + (i.cost || 0), 0) ?? 0
 
+  function startCreate() {
+    setEditForm({
+      id: null,
+      date: todayISO(),
+      category: 'achat',
+      equipment: '',
+      description: '',
+      supplier: '',
+      technician: 'Propriétaire',
+      cost: '',
+      notes: '',
+      stockId: '',
+      stockQty: '',
+    })
+  }
+
   function startEdit(item) {
     setEditForm({
       id: item.id,
+      stockId: item.stockId ?? '',
+      stockQty: item.stockQty ? String(item.stockQty) : '',
       date: item.date ?? '',
       category: item.category ?? 'maintenance',
       equipment: item.equipment ?? '',
@@ -69,13 +88,18 @@ export default function History() {
 
   async function saveEdit(e) {
     e.preventDefault()
-    const { id, cost, ...rest } = editForm
+    const { id, cost, stockId, stockQty, ...rest } = editForm
+    const qty = Number(stockQty)
+    const link = rest.category === 'achat' && stockId && qty > 0 ? { stockId, qty } : null
+    const previous = id ? interventionsRaw?.find(i => i.id === id) ?? null : null
     setSaving(true)
     try {
-      await updateDoc(doc(firestoreDb, `users/${uid}/interventions`, id), {
-        ...rest,
-        description: rest.description.trim(),
-        cost: cost ? Number(cost) : 0,
+      await saveIntervention(uid, {
+        id,
+        values: { ...rest, description: rest.description.trim(), cost: cost ? Number(cost) : 0 },
+        link,
+        previous,
+        stocks,
       })
       setEditForm(null)
     } finally {
@@ -83,8 +107,8 @@ export default function History() {
     }
   }
 
-  async function deleteIntervention(id) {
-    await deleteDoc(doc(firestoreDb, `users/${uid}/interventions`, id))
+  async function deleteIntervention(item) {
+    await removeIntervention(uid, item, stocks)
     setConfirmDelete(null)
   }
 
@@ -192,14 +216,24 @@ export default function History() {
         </div>
       </div>
 
-      {/* Modifier une intervention */}
+      <button
+        onClick={startCreate}
+        aria-label="Ajouter une intervention"
+        className="fixed bottom-24 lg:bottom-6 right-4 lg:right-6 w-12 h-12 bg-brand text-white rounded-full shadow-lg flex items-center justify-center hover:bg-brand-light transition-colors z-40"
+      >
+        <Plus size={22} />
+      </button>
+
+      {/* Ajouter / modifier une intervention */}
       {editForm && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-brand-dark/30 backdrop-blur-sm">
           <form
             onSubmit={saveEdit}
             className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto"
           >
-            <p className="font-bold text-brand-dark font-serif">Modifier l'intervention</p>
+            <p className="font-bold text-brand-dark font-serif">
+              {editForm.id ? "Modifier l'intervention" : 'Nouvelle intervention'}
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -240,6 +274,31 @@ export default function History() {
               </div>
             </div>
 
+            {editForm.category === 'achat' && (
+              <div className="rounded-xl bg-stone-50 p-3 space-y-3">
+                <p className="text-xs text-stone-500">
+                  Lier à un article pour ajouter la quantité achetée au stock (le prix unitaire est mis à jour).
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="label">Article en stock</label>
+                    <select className="input-field" value={editForm.stockId} onChange={setEdit('stockId')}>
+                      <option value="">— Aucun —</option>
+                      {stocks.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Quantité</label>
+                    <input
+                      type="number" min="1" step="1" className="input-field"
+                      required={Boolean(editForm.stockId)}
+                      value={editForm.stockQty} onChange={setEdit('stockQty')}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="label">Intervenant</label>
               <input className="input-field" value={editForm.technician} onChange={setEdit('technician')} />
@@ -268,7 +327,7 @@ export default function History() {
             <p className="text-sm text-stone-500 mb-5">{confirmDelete.description}</p>
             <div className="flex gap-3">
               <button className="btn-secondary flex-1" onClick={() => setConfirmDelete(null)}>Annuler</button>
-              <button className="btn-danger flex-1" onClick={() => deleteIntervention(confirmDelete.id)}>Supprimer</button>
+              <button className="btn-danger flex-1" onClick={() => deleteIntervention(confirmDelete)}>Supprimer</button>
             </div>
           </div>
         </div>
