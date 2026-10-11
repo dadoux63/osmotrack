@@ -49,10 +49,12 @@ export async function migrateToFirestore(uid) {
         Object.entries(obj).filter(([, v]) => v !== undefined)
       )
 
-    await batchWrite(readings, 'readings', clean)
-    await batchWrite(interventions, 'interventions', clean)
-    await batchWrite(maintenance, 'maintenance', clean)
-    await batchWrite(stocks, 'stocks', clean)
+    await Promise.all([
+      batchWrite(readings, 'readings', clean),
+      batchWrite(interventions, 'interventions', clean),
+      batchWrite(maintenance, 'maintenance', clean),
+      batchWrite(stocks, 'stocks', clean),
+    ])
 
     // Settings use key as doc ID
     if (settings.length > 0) {

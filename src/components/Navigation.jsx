@@ -1,9 +1,10 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, PlusCircle, Wrench, History,
   Package, BarChart3, Settings, Droplets, User, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useLogout } from '../hooks/useLogout'
 
 const NAV_ITEMS = [
   { to: '/dashboard',  label: 'Tableau de bord', Icon: LayoutDashboard },
@@ -17,13 +18,8 @@ const NAV_ITEMS = [
 
 // ── Sidebar (desktop) ─────────────────────────────────────────
 export function Sidebar({ onClose }) {
-  const { currentUser, logout } = useAuth()
-  const navigate = useNavigate()
-
-  function handleLogout() {
-    logout()
-    navigate('/login', { replace: true })
-  }
+  const { currentUser } = useAuth()
+  const handleLogout = useLogout()
 
   return (
     <nav className="flex flex-col h-full">

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { deleteDoc, doc } from 'firebase/firestore'
-import { Trash2, Filter, Euro } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { firestoreDb } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useCollection } from '../hooks/useFirestore'

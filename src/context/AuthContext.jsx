@@ -16,14 +16,15 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(undefined) // undefined = loading
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Migrate local Dexie data on first login from this device
-        await migrateToFirestore(user.uid)
-        // Seed demo data if Firestore is still empty (new account, no local data)
-        await seedDatabase(user.uid)
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // Set currentUser immediately so the app stops spinning
       setCurrentUser(user ?? null)
+      if (user) {
+        // Run migration + seed in background; UI reflects data as it arrives
+        migrateToFirestore(user.uid)
+          .then(() => seedDatabase(user.uid))
+          .catch((err) => console.error('[OsmoTrack] Init error:', err))
+      }
     })
     return unsubscribe
   }, [])
