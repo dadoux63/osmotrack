@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Droplets, User, Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
@@ -15,6 +17,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   useEffect(() => {
     if (currentUser) navigate('/dashboard', { replace: true })
@@ -23,10 +26,29 @@ export default function Login() {
   function switchMode(registering) {
     setIsRegistering(registering)
     setError('')
+    setResetSent(false)
     setDisplayName('')
     setEmail('')
     setPassword('')
     setConfirm('')
+  }
+
+  async function handlePasswordReset() {
+    if (!email.trim()) {
+      setError("Saisissez votre adresse email avant de réinitialiser le mot de passe.")
+      return
+    }
+    setError('')
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      setResetSent(true)
+    } catch (err) {
+      const msg = {
+        'auth/user-not-found':  'Aucun compte associé à cette adresse email.',
+        'auth/invalid-email':   'Adresse email invalide.',
+      }[err.code] ?? err.message
+      setError(msg)
+    }
   }
 
   async function handleSubmit(e) {
@@ -140,6 +162,22 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            {!isRegistering && (
+              <div className="flex justify-end -mt-1">
+                {resetSent ? (
+                  <span className="text-xs text-green-600">Email envoyé ✓</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    className="text-xs text-brand underline hover:text-brand-dark"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                )}
+              </div>
+            )}
 
             {isRegistering && (
               <div>
