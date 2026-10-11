@@ -29,6 +29,8 @@ export default function History() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const { currentUser } = useAuth()
   const uid = currentUser?.uid
 
@@ -51,6 +53,7 @@ export default function History() {
   const allTotal = interventions?.reduce((s, i) => s + (i.cost || 0), 0) ?? 0
 
   function startCreate() {
+    setFormError('')
     setEditForm({
       id: null,
       date: todayISO(),
@@ -67,10 +70,11 @@ export default function History() {
   }
 
   function startEdit(item) {
+    setFormError('')
     setEditForm({
       id: item.id,
       stockId: item.stockId ?? '',
-      stockQty: item.stockQty ? String(item.stockQty) : '',
+      stockQty: item.stockQty ? String(Math.abs(item.stockQty)) : '',
       date: item.date ?? '',
       category: item.category ?? 'maintenance',
       equipment: item.equipment ?? '',
@@ -90,9 +94,11 @@ export default function History() {
     e.preventDefault()
     const { id, cost, stockId, stockQty, ...rest } = editForm
     const qty = Number(stockQty)
-    const link = rest.category === 'achat' && stockId && qty > 0 ? { stockId, qty } : null
+    const sign = rest.category === 'achat' ? 1 : -1
+    const link = stockId && qty > 0 ? { stockId, qty: sign * qty } : null
     const previous = id ? interventionsRaw?.find(i => i.id === id) ?? null : null
     setSaving(true)
+    setFormError('')
     try {
       await saveIntervention(uid, {
         id,
@@ -102,14 +108,21 @@ export default function History() {
         stocks,
       })
       setEditForm(null)
+    } catch (err) {
+      setFormError(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function deleteIntervention(item) {
-    await removeIntervention(uid, item, stocks)
-    setConfirmDelete(null)
+    setDeleteError('')
+    try {
+      await removeIntervention(uid, item, stocks)
+      setConfirmDelete(null)
+    } catch (err) {
+      setDeleteError(err.message)
+    }
   }
 
   return (
@@ -181,7 +194,7 @@ export default function History() {
                     <Pencil size={14} />
                   </button>
                   <button
-                    onClick={() => setConfirmDelete(item)}
+                    onClick={() => { setDeleteError(''); setConfirmDelete(item) }}
                     className="text-stone-300 hover:text-red-500 transition-colors"
                     aria-label="Supprimer"
                   >
@@ -274,30 +287,30 @@ export default function History() {
               </div>
             </div>
 
-            {editForm.category === 'achat' && (
-              <div className="rounded-xl bg-stone-50 p-3 space-y-3">
-                <p className="text-xs text-stone-500">
-                  Lier à un article pour ajouter la quantité achetée au stock (le prix unitaire est mis à jour).
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <label className="label">Article en stock</label>
-                    <select className="input-field" value={editForm.stockId} onChange={setEdit('stockId')}>
-                      <option value="">— Aucun —</option>
-                      {stocks.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">Quantité</label>
-                    <input
-                      type="number" min="1" step="1" className="input-field"
-                      required={Boolean(editForm.stockId)}
-                      value={editForm.stockQty} onChange={setEdit('stockQty')}
-                    />
-                  </div>
+            <div className="rounded-xl bg-stone-50 p-3 space-y-3">
+              <p className="text-xs text-stone-500">
+                {editForm.category === 'achat'
+                  ? "Lier à un article pour ajouter la quantité achetée au stock (le prix unitaire est mis à jour)."
+                  : "Lier à un article pour retirer la quantité utilisée du stock."}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="label">Article en stock</label>
+                  <select className="input-field" value={editForm.stockId} onChange={setEdit('stockId')}>
+                    <option value="">— Aucun —</option>
+                    {stocks.map(s => <option key={s.id} value={s.id}>{s.name} ({s.currentQty})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Quantité</label>
+                  <input
+                    type="number" min="1" step="1" className="input-field"
+                    required={Boolean(editForm.stockId)}
+                    value={editForm.stockQty} onChange={setEdit('stockQty')}
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
             <div>
               <label className="label">Intervenant</label>
@@ -308,6 +321,10 @@ export default function History() {
               <label className="label">Remarques</label>
               <textarea className="input-field resize-none" rows={2} value={editForm.notes} onChange={setEdit('notes')} />
             </div>
+
+            {formError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5">{formError}</p>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button type="button" className="btn-secondary flex-1" onClick={() => setEditForm(null)}>Annuler</button>
@@ -325,6 +342,9 @@ export default function History() {
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5">
             <p className="font-bold text-brand-dark mb-2">Supprimer cette entrée ?</p>
             <p className="text-sm text-stone-500 mb-5">{confirmDelete.description}</p>
+            {deleteError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 mb-4">{deleteError}</p>
+            )}
             <div className="flex gap-3">
               <button className="btn-secondary flex-1" onClick={() => setConfirmDelete(null)}>Annuler</button>
               <button className="btn-danger flex-1" onClick={() => deleteIntervention(confirmDelete)}>Supprimer</button>

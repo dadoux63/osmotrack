@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { addDoc, updateDoc, collection, doc } from 'firebase/firestore'
+import { doc } from 'firebase/firestore'
 import { CheckCircle2, ChevronRight, CalendarCheck } from 'lucide-react'
 import { firestoreDb } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useCollection } from '../hooks/useFirestore'
+import { saveIntervention } from '../db/interventions'
 import StatusBadge from '../components/StatusBadge'
 import { getMaintenanceStatus, formatDate, formatDateLong, todayISO } from '../utils/maintenance'
 
@@ -17,26 +18,46 @@ function daysLabel(days) {
   return `Dans ${days} j`
 }
 
-function MarkDoneModal({ item, uid, onConfirm, onClose }) {
+function MarkDoneModal({ item, uid, stocks, onConfirm, onClose }) {
   const [date, setDate] = useState(todayISO())
   const [cost, setCost] = useState('')
   const [notes, setNotes] = useState('')
+  const [stockId, setStockId] = useState('')
+  const [qty, setQty] = useState('1')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const sortedStocks = [...stocks].sort((a, b) =>
+    (b.category === item.category) - (a.category === item.category) || a.name.localeCompare(b.name, 'fr')
+  )
+  const selected = stocks.find(s => s.id === stockId)
 
   async function handleConfirm() {
-    // Log intervention
-    await addDoc(collection(firestoreDb, `users/${uid}/interventions`), {
-      date,
-      equipment: item.equipment,
-      category: item.category?.toLowerCase() || 'maintenance',
-      description: item.description,
-      supplier: '',
-      cost: cost ? Number(cost) : 0,
-      technician: 'Propriétaire',
-      notes,
-    })
-    // Update maintenance lastDate
-    await updateDoc(doc(firestoreDb, `users/${uid}/maintenance`, item.id), { lastDate: date })
-    onConfirm()
+    setError('')
+    setSaving(true)
+    try {
+      await saveIntervention(uid, {
+        values: {
+          date,
+          equipment: item.equipment,
+          category: item.category?.toLowerCase() || 'maintenance',
+          description: item.description,
+          supplier: '',
+          cost: cost ? Number(cost) : 0,
+          technician: 'Propriétaire',
+          notes,
+        },
+        link: selected && Number(qty) > 0 ? { stockId: selected.id, qty: -Number(qty) } : null,
+        previous: null,
+        stocks,
+        extra: (batch) => batch.update(doc(firestoreDb, `users/${uid}/maintenance`, item.id), { lastDate: date }),
+      })
+      onConfirm()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -55,14 +76,40 @@ function MarkDoneModal({ item, uid, onConfirm, onClose }) {
             <label className="label">Coût (€)</label>
             <input type="number" min="0" step="0.01" className="input-field" placeholder="0" value={cost} onChange={e => setCost(e.target.value)} />
           </div>
+          <div className="rounded-xl bg-stone-50 p-3 space-y-3">
+            <p className="text-xs text-stone-500">Article utilisé (optionnel) : sa quantité est retirée du stock.</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className="label">Article</label>
+                <select className="input-field" value={stockId} onChange={e => setStockId(e.target.value)}>
+                  <option value="">— Aucun —</option>
+                  {sortedStocks.map(st => (
+                    <option key={st.id} value={st.id}>{st.name} ({st.currentQty})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Quantité</label>
+                <input
+                  type="number" min="1" step="1" className="input-field"
+                  disabled={!stockId} value={qty} onChange={e => setQty(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
           <div>
             <label className="label">Notes</label>
             <textarea className="input-field resize-none" rows={2} placeholder="Observations…" value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
         </div>
+        {error && (
+          <p className="mx-5 mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5">{error}</p>
+        )}
         <div className="p-5 pt-0 flex gap-3">
           <button className="btn-secondary flex-1" onClick={onClose}>Annuler</button>
-          <button className="btn-primary flex-1" onClick={handleConfirm}>Confirmer</button>
+          <button className="btn-primary flex-1" onClick={handleConfirm} disabled={saving}>
+            {saving ? '…' : 'Confirmer'}
+          </button>
         </div>
       </div>
     </div>
@@ -77,6 +124,7 @@ export default function Maintenance() {
   const uid = currentUser?.uid
 
   const maintenance = useCollection(uid ? `users/${uid}/maintenance` : null)
+  const stocks = useCollection(uid ? `users/${uid}/stocks` : null)
 
   const items = maintenance
     ?.map(m => ({ ...m, ...getMaintenanceStatus(m.lastDate, m.intervalDays) }))
@@ -176,6 +224,7 @@ export default function Maintenance() {
         <MarkDoneModal
           item={modalItem}
           uid={uid}
+          stocks={stocks ?? []}
           onConfirm={() => {
             setModalItem(null)
             setDone(modalItem.id)
