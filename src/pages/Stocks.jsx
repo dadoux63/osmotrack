@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { updateDoc, addDoc, collection, doc } from 'firebase/firestore'
+import { addDoc, collection, doc, increment, writeBatch } from 'firebase/firestore'
 import { Plus, Minus, ShoppingCart, Package } from 'lucide-react'
 import { firestoreDb } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useCollection } from '../hooks/useFirestore'
 import StatusBadge from '../components/StatusBadge'
-import { getStockStatus } from '../utils/maintenance'
+import { getStockStatus, formatDate, todayISO } from '../utils/maintenance'
 
 const CATEGORIES = ['Tous', 'Filtres entrée', 'Adoucisseur', 'Lampe UV', 'Osmoseur']
 
@@ -13,8 +13,19 @@ function StockItem({ item, uid }) {
   const status = getStockStatus(item.currentQty, item.minQty)
 
   async function adjustQty(delta) {
-    const newQty = Math.max(0, item.currentQty + delta)
-    await updateDoc(doc(firestoreDb, `users/${uid}/stocks`, item.id), { currentQty: newQty })
+    if (item.currentQty + delta < 0) return
+    const batch = writeBatch(firestoreDb)
+    batch.update(doc(firestoreDb, `users/${uid}/stocks`, item.id), { currentQty: increment(delta) })
+    batch.set(doc(collection(firestoreDb, `users/${uid}/stockMovements`)), {
+      stockId: item.id,
+      stockName: item.name,
+      qty: delta,
+      type: 'ajustement',
+      date: todayISO(),
+      label: 'Ajustement manuel',
+      createdAt: Date.now(),
+    })
+    await batch.commit()
   }
 
   return (
@@ -149,6 +160,54 @@ function AddStockModal({ uid, onClose }) {
   )
 }
 
+const MOVEMENT_LABELS = { achat: 'Achat', ajustement: 'Ajustement', utilisation: 'Utilisation' }
+
+function MovementJournal({ movements }) {
+  const [showAll, setShowAll] = useState(false)
+  if (!movements) return null
+
+  const sorted = [...movements].sort((a, b) =>
+    b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0)
+  )
+  const shown = showAll ? sorted : sorted.slice(0, 10)
+
+  return (
+    <div className="mt-8">
+      <h2 className="section-title mb-3">Mouvements de stock ({sorted.length})</h2>
+      {sorted.length === 0 ? (
+        <p className="text-stone-400 text-sm">
+          Aucun mouvement. Les achats liés à un article et les ajustements + / − apparaissent ici.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {shown.map(m => (
+            <div key={m.id} className="card flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-brand-dark truncate">{m.stockName}</p>
+                <p className="text-xs text-stone-400">
+                  {formatDate(m.date)} · {MOVEMENT_LABELS[m.type] ?? m.type}
+                  {m.label && m.type !== 'ajustement' ? ` — ${m.label}` : ''}
+                </p>
+              </div>
+              <span className={`font-bold text-sm flex-shrink-0 ${m.qty > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {m.qty > 0 ? `+${m.qty}` : m.qty}
+              </span>
+            </div>
+          ))}
+          {sorted.length > 10 && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className="text-xs text-brand underline w-full text-center pt-1"
+            >
+              {showAll ? 'Réduire' : `Afficher tout (${sorted.length})`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Stocks() {
   const [activeCategory, setActiveCategory] = useState('Tous')
   const [showAdd, setShowAdd] = useState(false)
@@ -156,6 +215,7 @@ export default function Stocks() {
   const uid = currentUser?.uid
 
   const stocks = useCollection(uid ? `users/${uid}/stocks` : null)
+  const movements = useCollection(uid ? `users/${uid}/stockMovements` : null)
 
   const filtered = stocks
     ?.filter(s => activeCategory === 'Tous' || s.category === activeCategory)
@@ -224,6 +284,8 @@ export default function Stocks() {
           </div>
         )}
       </div>
+
+      <MovementJournal movements={movements} />
 
       {/* FAB */}
       <button
