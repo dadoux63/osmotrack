@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { deleteDoc, doc } from 'firebase/firestore'
-import { Trash2 } from 'lucide-react'
+import { deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { Trash2, Pencil } from 'lucide-react'
 import { firestoreDb } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useCollection } from '../hooks/useFirestore'
@@ -28,6 +28,8 @@ function CategoryTag({ category }) {
 export default function History() {
   const [filterCategory, setFilterCategory] = useState('tous')
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [editForm, setEditForm] = useState(null)
+  const [saving, setSaving] = useState(false)
   const { currentUser } = useAuth()
   const uid = currentUser?.uid
 
@@ -46,6 +48,40 @@ export default function History() {
 
   const totalCost = filtered.reduce((s, i) => s + (i.cost || 0), 0)
   const allTotal = interventions?.reduce((s, i) => s + (i.cost || 0), 0) ?? 0
+
+  function startEdit(item) {
+    setEditForm({
+      id: item.id,
+      date: item.date ?? '',
+      category: item.category ?? 'maintenance',
+      equipment: item.equipment ?? '',
+      description: item.description ?? '',
+      supplier: item.supplier ?? '',
+      technician: item.technician ?? '',
+      cost: item.cost ? String(item.cost) : '',
+      notes: item.notes ?? '',
+    })
+  }
+
+  function setEdit(field) {
+    return (e) => setEditForm(f => ({ ...f, [field]: e.target.value }))
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    const { id, cost, ...rest } = editForm
+    setSaving(true)
+    try {
+      await updateDoc(doc(firestoreDb, `users/${uid}/interventions`, id), {
+        ...rest,
+        description: rest.description.trim(),
+        cost: cost ? Number(cost) : 0,
+      })
+      setEditForm(null)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function deleteIntervention(id) {
     await deleteDoc(doc(firestoreDb, `users/${uid}/interventions`, id))
@@ -112,12 +148,22 @@ export default function History() {
                 <span className={`font-bold text-sm ${item.cost > 0 ? 'text-brand-dark' : 'text-stone-400'}`}>
                   {item.cost > 0 ? `${item.cost.toFixed(2)} €` : 'Gratuit'}
                 </span>
-                <button
-                  onClick={() => setConfirmDelete(item)}
-                  className="text-stone-300 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => startEdit(item)}
+                    className="text-stone-300 hover:text-brand transition-colors"
+                    aria-label="Modifier"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(item)}
+                    className="text-stone-300 hover:text-red-500 transition-colors"
+                    aria-label="Supprimer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -145,6 +191,74 @@ export default function History() {
           ))}
         </div>
       </div>
+
+      {/* Modifier une intervention */}
+      {editForm && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-brand-dark/30 backdrop-blur-sm">
+          <form
+            onSubmit={saveEdit}
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            <p className="font-bold text-brand-dark font-serif">Modifier l'intervention</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Date</label>
+                <input type="date" className="input-field" required value={editForm.date} onChange={setEdit('date')} />
+              </div>
+              <div>
+                <label className="label">Catégorie</label>
+                <select className="input-field" value={editForm.category} onChange={setEdit('category')}>
+                  {Object.entries(CATEGORIES).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Description</label>
+              <input className="input-field" required value={editForm.description} onChange={setEdit('description')} />
+            </div>
+
+            <div>
+              <label className="label">Équipement</label>
+              <input className="input-field" value={editForm.equipment} onChange={setEdit('equipment')} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Fournisseur</label>
+                <input className="input-field" value={editForm.supplier} onChange={setEdit('supplier')} />
+              </div>
+              <div>
+                <label className="label">Prix <span className="normal-case font-normal">(€)</span></label>
+                <input
+                  type="number" min="0" step="0.01" className="input-field" placeholder="0"
+                  value={editForm.cost} onChange={setEdit('cost')}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Intervenant</label>
+              <input className="input-field" value={editForm.technician} onChange={setEdit('technician')} />
+            </div>
+
+            <div>
+              <label className="label">Remarques</label>
+              <textarea className="input-field resize-none" rows={2} value={editForm.notes} onChange={setEdit('notes')} />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setEditForm(null)}>Annuler</button>
+              <button type="submit" disabled={saving} className="btn-primary flex-1">
+                {saving ? '…' : 'Enregistrer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Confirm delete */}
       {confirmDelete && (
