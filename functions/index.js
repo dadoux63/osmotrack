@@ -1,4 +1,5 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler'
+import { logger } from 'firebase-functions'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getMessaging } from 'firebase-admin/messaging'
@@ -71,6 +72,7 @@ export const weeklyReminder = onSchedule(
     const now = Date.now()
 
     const tokenDocs = await db.collectionGroup('fcmTokens').get()
+    logger.info(`Appareils abonnés : ${tokenDocs.size}`)
     const tokensByUid = new Map()
     tokenDocs.forEach((d) => {
       const uid = d.ref.parent.parent.id
@@ -82,15 +84,26 @@ export const weeklyReminder = onSchedule(
       const metaRef = db.doc(`users/${uid}/meta/notifications`)
       const meta = await metaRef.get()
       const lastSentAt = meta.exists ? meta.data().lastSentAt : 0
-      if (now - lastSentAt < MIN_DAYS_BETWEEN_SENDS * DAY_MS) continue
+      if (now - lastSentAt < MIN_DAYS_BETWEEN_SENDS * DAY_MS) {
+        logger.info(`Utilisateur ${uid} : envoi déjà fait cette semaine, ignoré`)
+        continue
+      }
 
       const message = await buildMessage(db, uid, now)
-      if (!message) continue
+      if (!message) {
+        logger.info(`Utilisateur ${uid} : rien à signaler, aucune notification`)
+        continue
+      }
 
       const res = await messaging.sendEachForMulticast({
         tokens: entries.map((e) => e.token),
         data: message,
         webpush: { headers: { TTL: String(3 * DAY_MS / 1000) } },
+      })
+
+      logger.info(`Utilisateur ${uid} : ${res.successCount} envoi(s) réussi(s), ${res.failureCount} échec(s)`)
+      res.responses.forEach((r) => {
+        if (!r.success) logger.error('Échec FCM', { code: r.error?.code, message: r.error?.message })
       })
 
       await Promise.all(
